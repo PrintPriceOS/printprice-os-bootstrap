@@ -1,0 +1,98 @@
+version: "3.8"
+
+services:
+  # MySQL Canonical Database
+  mysql:
+    image: mysql:8.0
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=printprice_os
+      - MYSQL_USER=ppos_user
+      - MYSQL_PASSWORD=ppos_pass
+    volumes:
+      - ./mysql-init:/docker-entrypoint-initdb.d
+    networks:
+      - printprice-network
+
+  # Message Broker
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - printprice-network
+
+  # Observability
+  otel-collector:
+    image: otel/opentelemetry-collector:latest
+    command: [ "--config=/etc/otel-collector.yaml" ]
+    volumes:
+      - ./observability/otel-collector.yaml:/etc/otel-collector.yaml
+    ports:
+      - "4317:4317" # OTLP gRPC
+      - "4318:4318" # OTLP HTTP
+    networks:
+      - printprice-network
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - printprice-network
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    networks:
+      - printprice-network
+
+  # Application Services
+  api-gateway:
+    build:
+      context: ./api-gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - MYSQL_HOST=mysql
+      - MYSQL_USER=ppos_user
+      - MYSQL_PASSWORD=ppos_pass
+      - MYSQL_DATABASE=printprice_os
+      - RABBITMQ_URL=amqp://rabbitmq
+      - TEMPORAL_ADDRESS=temporal:7233
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+    depends_on:
+      - mysql
+      - rabbitmq
+      - otel-collector
+    networks:
+      - printprice-network
+
+  workers:
+    build:
+      context: ./workers
+    environment:
+      - MYSQL_HOST=mysql
+      - MYSQL_USER=ppos_user
+      - MYSQL_PASSWORD=ppos_pass
+      - MYSQL_DATABASE=printprice_os
+      - TEMPORAL_ADDRESS=temporal:7233
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+    depends_on:
+      - temporal
+      - mysql
+    networks:
+      - printprice-network
+
+networks:
+  printprice-network:
+    external: true

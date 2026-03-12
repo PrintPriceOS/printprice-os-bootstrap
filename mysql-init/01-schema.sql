@@ -1,0 +1,31 @@
+CREATE DATABASE IF NOT EXISTS printprice_os;
+USE printprice_os;
+
+CREATE TABLE canonical_job_registry (
+    job_id VARCHAR(36) PRIMARY KEY,
+    workflow_id VARCHAR(255) NOT NULL,
+    workflow_run_id VARCHAR(255) NOT NULL,
+    trace_id VARCHAR(255) NOT NULL,
+    customer_tier ENUM('STANDARD', 'PREMIUM', 'ENTERPRISE') NOT NULL DEFAULT 'STANDARD',
+    current_stage ENUM(
+        'INGESTED', 'PREFLIGHTING', 'PRICING', 'MATCHMAKING', 'DISPATCHED', 
+        'NODE_ACCEPTED', 'IN_PRODUCTION', 'SHIPPED', 
+        'FAILED_PREFLIGHT', 'FAILED_PRICING', 'FAILED_MATCHMAKING', 'MANUAL_REVIEW',
+        'PAYMENT_PENDING', 'PAYMENT_AUTHORIZED', 'PAYMENT_CAPTURED', 'REFUND_PENDING', 'REFUNDED', 'CANCELLED'
+    ) NOT NULL,
+    matched_node_id VARCHAR(255),
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    sla_deadline DATETIME(3) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE job_events_ledger (
+    event_id VARCHAR(36) PRIMARY KEY,
+    job_id VARCHAR(36) NOT NULL,
+    previous_stage VARCHAR(50),
+    new_stage VARCHAR(50) NOT NULL,
+    trigger_activity VARCHAR(255) NOT NULL,
+    trace_id VARCHAR(255) NOT NULL,
+    event_timestamp DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    event_payload JSON
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
