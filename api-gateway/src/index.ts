@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { Connection, Client } from '@temporalio/client';
 import express, { Request, Response, NextFunction } from 'express';
 import nodeRouter from './nodeRegistry';
@@ -8,6 +9,13 @@ import { trace, context } from '@opentelemetry/api';
 
 const app = express();
 app.use(express.json());
+
+app.get('/health', (_req, res) => {
+  res.status(200).json({
+    ok: true,
+    service: 'api-gateway'
+  });
+});
 app.use('/api/v1/nodes', nodeRouter);
 app.use('/api/v1/telemetry', telemetryRouter);
 
